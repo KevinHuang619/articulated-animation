@@ -6,7 +6,8 @@ Such code is provided as-is, without warranty of any kind, express or implied, i
 title, fitness for a particular purpose, non-infringement, or that such code is free of defects, errors or viruses.
 In no event will Snap Inc. be liable for any damages or losses of any kind arising from the sample code or your use thereof.
 """
-
+import cv2
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -101,8 +102,17 @@ class Generator(nn.Module):
                                                           source_region_params=source_region_params,
                                                           bg_params=bg_params)
             output_dict["deformed"] = self.deform_input(source_image, motion_params['optical_flow'])
+            
+            source_img = source_image.permute(0, 2, 3, 1)[0].detach().cpu().numpy()
+            deformed_img = output_dict["deformed"].permute(0, 2, 3, 1)[0].detach().cpu().numpy()
+
+            cv2.imwrite('source.png', (source_img * 255).astype(np.uint8))
+            cv2.imwrite('deformed.png', (deformed_img * 255).astype(np.uint8))
+
             if 'occlusion_map' in motion_params:
                 output_dict['occlusion_map'] = motion_params['occlusion_map']
+            if 'optical_flow' in motion_params:
+                output_dict['optical_flow'] = motion_params['optical_flow']
         else:
             motion_params = None
 
@@ -122,5 +132,8 @@ class Generator(nn.Module):
             out = self.apply_optical(input_skip=source_image, input_previous=out, motion_params=motion_params)
 
         output_dict["prediction"] = out
+
+        predict_img = output_dict["prediction"].permute(0, 2, 3, 1)[0].detach().cpu().numpy()
+        cv2.imwrite('predict_img.png', (predict_img * 255).astype(np.uint8))
 
         return output_dict

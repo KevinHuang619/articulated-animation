@@ -10,13 +10,17 @@ In no event will Snap Inc. be liable for any damages or losses of any kind arisi
 from torch import nn
 import torch
 import torch.nn.functional as F
-from modules.util import Hourglass, make_coordinate_grid, AntiAliasInterpolation2d, Encoder
 
+import sys
+sys.path.append("/home/kevinhuang/github/articulated-animation")
+from modules.util import Hourglass, make_coordinate_grid, AntiAliasInterpolation2d, Encoder
+import numpy as np
 
 def svd(covar, fast=False):
     if fast:
-        from torch_batch_svd import svd as fast_svd
-        return fast_svd(covar)
+        # from torch_batch_svd import svd as fast_svd
+        # return fast_svd(covar)
+        pass
     else:
         u, s, v = torch.svd(covar.cpu())
         s = s.to(covar.device)
@@ -61,10 +65,11 @@ class RegionPredictor(nn.Module):
         shape = region.shape
         region = region.unsqueeze(-1)
         grid = make_coordinate_grid(shape[2:], region.type()).unsqueeze_(0).unsqueeze_(0)
-        mean = (region * grid).sum(dim=(2, 3))
+        mean = (region * grid).sum(dim=(2, 3)) # softargmax, eq1 
 
         region_params = {'shift': mean}
 
+        # Eq. 6
         if self.pca_based:
             mean_sub = grid - mean.unsqueeze(-2).unsqueeze(-2)
             covar = torch.matmul(mean_sub.unsqueeze(-1), mean_sub.unsqueeze(-2))
@@ -102,6 +107,7 @@ class RegionPredictor(nn.Module):
             jacobian = jacobian.view(jacobian.shape[0], jacobian.shape[1], 2, 2)
             region_params['affine'] = jacobian
             region_params['covar'] = torch.matmul(jacobian, jacobian.permute(0, 1, 3, 2))
+        # Eq. 7
         elif self.pca_based:
             covar = region_params['covar']
             shape = covar.shape
@@ -115,3 +121,8 @@ class RegionPredictor(nn.Module):
             region_params['d'] = d
 
         return region_params
+
+if __name__ == '__main__':
+    region_predictor = RegionPredictor(32, 10, 3, 1024, 5, 0.1, pca_based=True)
+    x = torch.randn(1,3,256,256)
+    out = region_predictor(x)

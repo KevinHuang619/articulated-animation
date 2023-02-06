@@ -101,7 +101,11 @@ def make_animation(source_image, driving_video, generator, region_predictor, avd
 
 
 def main(opt):
+    import cv2
     source_image = imageio.imread(opt.source_image)
+    # source_image = source_image[:, :, np.newaxis]
+    source_image = cv2.cvtColor(source_image, cv2.COLOR_GRAY2RGB)
+    source_image = cv2.resize(source_image, (256, 256))
     reader = imageio.get_reader(opt.driving_video)
     fps = reader.get_meta_data()['fps']
     reader.close()

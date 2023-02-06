@@ -25,13 +25,13 @@ def region2gaussian(center, covar, spatial_size):
     shape = (1,) * number_of_leading_dimensions + coordinate_grid.shape
     coordinate_grid = coordinate_grid.view(*shape)
     repeats = mean.shape[:number_of_leading_dimensions] + (1, 1, 1)
-    coordinate_grid = coordinate_grid.repeat(*repeats)
+    coordinate_grid = coordinate_grid.repeat(*repeats) # N K H W C
 
     # Preprocess kp shape
     shape = mean.shape[:number_of_leading_dimensions] + (1, 1, 2)
     mean = mean.view(*shape)
 
-    mean_sub = (coordinate_grid - mean)
+    mean_sub = (coordinate_grid - mean) # z - u
     if type(covar) == float:
         out = torch.exp(-0.5 * (mean_sub ** 2).sum(-1) / covar)
     else:

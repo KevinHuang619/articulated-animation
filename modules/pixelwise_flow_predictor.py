@@ -7,6 +7,7 @@ title, fitness for a particular purpose, non-infringement, or that such code is 
 In no event will Snap Inc. be liable for any damages or losses of any kind arising from the sample code or your use thereof.
 """
 
+import numpy as np
 from torch import nn
 import torch.nn.functional as F
 import torch
@@ -113,6 +114,12 @@ class PixelwiseFlowPredictor(nn.Module):
         sparse_motion = self.create_sparse_motions(source_image, driving_region_params,
                                                    source_region_params, bg_params=bg_params)
         deformed_source = self.create_deformed_source_image(source_image, sparse_motion)
+
+        # visualize
+        # driving_heatmap = F.interpolate(out['driving_region_params']['heatmap'], size=source.shape[1:3])
+            # driving_heatmap = np.transpose(heatmap_representation.data.cpu().numpy(), [0, 2, 3, 1])
+            # draw_colored_heatmap(driving_heatmap, self.colormap, self.region_bg_color)
+
         if self.use_deformed_source:
             predictor_input = torch.cat([heatmap_representation, deformed_source], dim=2)
         else:

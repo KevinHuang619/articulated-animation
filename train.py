@@ -48,7 +48,7 @@ def train(config, generator, region_predictor, bg_predictor, checkpoint, log_dir
     with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'],
                 checkpoint_freq=train_params['checkpoint_freq']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
-            for x in dataloader:
+            for i, x in enumerate(dataloader):
                 losses, generated = model(x)
                 loss_values = [val.mean() for val in losses.values()]
                 loss = sum(loss_values)
@@ -57,6 +57,8 @@ def train(config, generator, region_predictor, bg_predictor, checkpoint, log_dir
                 optimizer.zero_grad()
                 losses = {key: value.mean().detach().data.cpu().numpy() for key, value in losses.items()}
                 logger.log_iter(losses=losses)
+                if (i % 10) == 0:
+                    print(f"step: {i}, total: {len(dataloader)}, loss: {loss}.")
 
             scheduler.step()
             logger.log_epoch(epoch, {'generator': generator,

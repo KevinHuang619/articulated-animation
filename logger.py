@@ -7,6 +7,7 @@ title, fitness for a particular purpose, non-infringement, or that such code is 
 In no event will Snap Inc. be liable for any damages or losses of any kind arising from the sample code or your use thereof.
 """
 
+import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -17,6 +18,8 @@ from skimage.draw import circle
 
 import matplotlib.pyplot as plt
 import collections
+
+from modules.util import make_coordinate_grid
 
 
 class Logger:
@@ -210,16 +213,74 @@ class Visualizer:
             occlusion_map = np.transpose(occlusion_map, [0, 2, 3, 1])
             images.append(occlusion_map)
 
+            occlusion_img = (occlusion_map[0] * 255).astype(np.uint8)
+            cv2.imwrite("occlusion_img.png", occlusion_img)
+
         # Heatmaps visualizations
         if 'heatmap' in out['driving_region_params']:
             driving_heatmap = F.interpolate(out['driving_region_params']['heatmap'], size=source.shape[1:3])
             driving_heatmap = np.transpose(driving_heatmap.data.cpu().numpy(), [0, 2, 3, 1])
             images.append(draw_colored_heatmap(driving_heatmap, self.colormap, self.region_bg_color))
 
+            driving_heatmap_img = (images[-1][0] * 255).astype(np.uint8)
+            cv2.imwrite("driving_heatmap_img.png", driving_heatmap_img)
+
         if 'heatmap' in out['source_region_params']:
             source_heatmap = F.interpolate(out['source_region_params']['heatmap'], size=source.shape[1:3])
             source_heatmap = np.transpose(source_heatmap.data.cpu().numpy(), [0, 2, 3, 1])
             images.append(draw_colored_heatmap(source_heatmap, self.colormap, self.region_bg_color))
+
+            source_heatmap_img = (images[-1][0] * 255).astype(np.uint8)
+            cv2.imwrite("source_heatmap_img.png", source_heatmap_img)
+
+        # optical flow visualizations
+
+        def visualize_optical_flow(flow, image):
+            import flow_vis
+
+            identity_grid = make_coordinate_grid(flow.shape[1:3], type=out['source_region_params']['shift'].type())
+            
+            flow = flow - identity_grid.unsqueeze(0)
+
+            flow = flow.permute(0, 3, 1, 2)
+            flow = F.interpolate(flow, size=image.shape[:2], mode='bilinear')
+            flow = flow.permute(0, 2, 3, 1)
+
+            flow2 = flow[0].detach().cpu().numpy()
+            flow2 = (flow2 - flow2.min()) / (flow2.max() - flow2.min())
+
+            flow_color = flow_vis.flow_to_color(flow2, convert_to_bgr=False)
+
+            return flow_color
+        
+        def visualize_optical_flow_cv(flow, image):
+
+            hsv = np.zeros_like(image)
+            hsv[..., 1] = 0
+
+            identity_grid = make_coordinate_grid((64, 64), type=out['source_region_params']['shift'].type())
+            
+            flow = flow - identity_grid.unsqueeze(0)
+
+            flow = flow.permute(0, 3, 1, 2)
+            flow = F.interpolate(flow, size=hsv.shape[:2], mode='bilinear')
+            flow = flow.permute(0, 2, 3, 1)
+            
+            x = flow[..., 0].detach().cpu().numpy()
+            y = flow[..., 1].detach().cpu().numpy()
+            mag, ang = cv2.cartToPolar(x, y)
+            hsv[..., 0] = ang * 180 / np.pi / 2
+            hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+            hsv = hsv.astype(np.float32)
+            bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+            return bgr
+            
+        bgr = visualize_optical_flow_cv(out['optical_flow'], images[-1][0])
+        flow_color = visualize_optical_flow(out['optical_flow'], images[-1][0])
+
+        cv2.imwrite("bgr.png", bgr)
+        cv2.imwrite('flow_color.png', flow_color)
 
         image = self.create_image_grid(*images)
         image = (255 * image).astype(np.uint8)
